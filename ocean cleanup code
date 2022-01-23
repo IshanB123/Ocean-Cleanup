@@ -1,0 +1,197 @@
+#include <SFE_BMP180.h> //includes the library SFE_BMP180
+#include <Wire.h>//includes library Wire.h
+#include <Servo.h>//includes library Servo.h
+
+const int analogInPin = A0; //sets analoginpin as A0
+int sensorValue = 0; //sets sensor value to 0
+int val;
+int tempPin = A1;
+int buf[10],temp;//references library and creates temperature variable
+Servo servo_test;
+int angle = 0;
+float calibration = 0.00;
+
+
+SFE_BMP180 pressure;//this code is to measure the temperature
+
+#define ALTITUDE 1655.0 //sets the altitude
+
+void setup()
+{
+  Serial.begin(9600);//initializes serial connection
+  Serial.println("REBOOT");//prints reboor
+
+
+  if (pressure.begin())//initializes pressure measurement
+    Serial.println("BMP180 init success");//prints succes in measurement
+  else// stops measurement
+  {
+    Serial.println("BMP180 init fail\n\n");
+    while(1); // Pause forever.
+  }
+  servo_test.attach (9);
+  const int temperaturePin = A1;//sets the temperaturePin as A1
+  int tempLED = 1;//sets the temperature LED pin as digital pin 1
+  int presLED = 2;//sets the pressure pressure LED pin as digital pin 1 
+  int phLED = 3;//sets the pH value LED as digital pin 3
+}
+
+void loop()//starts infinite loop
+{
+  char status;//the following code prints and measures the altiturde, temperature and pressure from the BMP 180 sensor
+  double T,P,p0,a;
+  
+  Serial.println();
+  Serial.print("provided altitude: ");
+  Serial.print(ALTITUDE,0);
+  Serial.print(" meters, ");
+  Serial.print(ALTITUDE*3.28084,0);
+  Serial.println(" feet");
+  
+  status = pressure.startTemperature();// starts temperature measurement
+  if (status != 0)
+  {
+    // Wait for the measurement to complete:
+    delay(status);//delay as musch as status
+
+    status = pressure.getTemperature(T);
+    if (status != 0)//if status is not zero the temperature will be printed in celsius and fahrenheit
+    {
+      // Print out the measurement:
+      Serial.print("temperature: ");
+      Serial.print(T,2);
+      Serial.print(" deg C, ");
+      Serial.print((9.0/5.0)*T+32.0,2);
+      Serial.println(" deg F");
+
+      status = pressure.startPressure(3);//starts pressure measurement
+      if (status != 0)
+      {
+        // Wait for the measurement to complete:
+        delay(status);
+
+        status = pressure.getPressure(P,T);
+        if (status != 0)
+        {
+          // Print out the measurement:
+          Serial.print("absolute pressure: ");
+          Serial.print(P,2);
+          Serial.print(" mb, ");
+          Serial.print(P*0.0295333727,2);
+          Serial.println(" inHg");
+
+          p0 = pressure.sealevel(P,ALTITUDE); // sets altitude to 1655 meters above sea level
+          Serial.print("relative (sea-level) pressure: ");//prints pressure relative to sea level
+          Serial.print(p0,2);
+          Serial.print(" mb, ");
+          Serial.print(p0*0.0295333727,2);
+          Serial.println(" inHg");
+
+          a = pressure.altitude(P,p0);//calculates the altitude according to sea level and pressure
+          Serial.print("computed altitude: ");
+          Serial.print(a,0);
+          Serial.print(" meters, ");
+          Serial.print(a*3.28084,0);
+          Serial.println(" feet");
+       
+
+          
+         
+          }
+         
+            int presLED = 2; 
+             if (P*0.0295333727 > 300) {//if the pressure is above 300Hg, the led will turn on and the gate to the cabin will be closed
+                Servo servo_test;
+                digitalWrite (presLED, HIGH);
+                servo_test.write(90);
+        }
+        else Serial.println("error retrieving pressure measurement\n");// the following are error messages in case something does not work
+      }
+      else Serial.println("error starting pressure measurement\n");
+    }
+    else Serial.println("error retrieving temperature measurement\n");
+  }
+  else Serial.println("error starting temperature measurement\n");
+
+  
+
+  
+//the following code is for the temperature sensor
+
+val = analogRead(tempPin);
+float mv = ( val/1024.0)*5000; 
+float cel = mv/10;
+float farh = (cel*9)/5 + 32;
+
+Serial.print("TEMPRATURE = ");
+Serial.print(cel);
+Serial.print("*C");
+Serial.println();
+delay(1000);
+int tempLED = 1;
+if (cel > 26) {
+
+  digitalWrite(tempLED, HIGH);
+  
+  }
+
+
+
+
+
+
+
+ 
+  if (tempPin > 86) {//if the tempeature is above 86 ferhenheit, the led will turn on or else it will turn off
+    digitalWrite (tempLED, HIGH);}
+  else {
+      digitalWrite (tempLED, LOW);
+  }
+  if (tempPin < 50) {// if the temperature is below 50 ferhenheit, the led will turn on or else it will turn off
+    digitalWrite (tempLED, HIGH);}
+  else { 
+      digitalWrite (tempLED, LOW);
+  }
+
+ 
+
+// the following code is for the pH sensor
+
+   for(int i=0;i<10;i++) //sets a for loop with the integer values displayed
+  { 
+   buf[i]=analogRead(analogInPin);//sets a buffer to read the analog pin and delay for 30 seconds
+  delay(30);
+   }
+   for(int i=0;i<9;i++)//sets a for loop with the integer values displayed
+  {
+  for(int j=i+1;j<10;j++)//sets a for loop with the integer values displayed
+  {
+   if(buf[i]>buf[j])//sets a for loop with the integer values displayed
+   {
+   temp=buf[i];//sets the temp as buf[i]
+   buf[i]=buf[j];//sets buf[i] as buf [j]
+  buf[j]=temp; //sets buf [j] as the temperature
+  }
+   }
+  }
+int  avgValue=0;//sets the average ph value as 0
+  for(int i=2;i<8;i++)
+   avgValue+=buf[i];//sets the average ph value as buf[i]
+  float pHVol=(float)avgValue*5.0/1024/6;//calculations for the ph value are in this line and the one below
+   float phValue = -5.70 * pHVol + calibration;
+   Serial.print("sensor = ");//orint the stron sensor =
+   Serial.println(phValue);//prints the pH value
+   if (phValue > 8){//if the pH value is above 8 (basic), the LED will turn on
+    int phLED = 3;
+    digitalWrite (phLED, HIGH);}
+   int phLED = 3;
+   if (phValue < 6){//if the pH value is below 6 (acidic), the LED will turn on
+    digitalWrite(phLED, HIGH);} 
+   
+   delay(500);
+}
+
+
+
+ 
+  
